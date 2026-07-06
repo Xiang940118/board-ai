@@ -1,191 +1,314 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Board AI Diamond</title>
+<title>Board Adventure AI</title>
 
 <style>
-body {
-  font-family: Arial;
-  background:#111;
-  color:#fff;
-  text-align:center;
+body{
+    background:#111;
+    color:white;
+    font-family:Arial;
+    text-align:center;
 }
 
-/* 棋盤容器 */
-.board {
-  width: 320px;
-  height: 320px;
-  margin: 20px auto;
-  position: relative;
+.board{
+    position:relative;
+    width:360px;
+    height:360px;
+    margin:20px auto;
 }
 
-/* 菱形格子 */
-.cell {
-  width: 45px;
-  height: 45px;
-  background:#222;
-  position:absolute;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  border-radius:8px;
-  cursor:pointer;
-  font-size:12px;
-  transform: rotate(45deg);
+.cell{
+    position:absolute;
+    width:42px;
+    height:42px;
+    background:#333;
+    border:1px solid #777;
+    border-radius:8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:14px;
+    cursor:pointer;
 }
 
-/* 文字反轉 */
-.cell span {
-  transform: rotate(-45deg);
-  display:block;
+.cell:hover{
+    transform:scale(1.1);
 }
 
-/* 起點 */
-.start {
-  background:#4caf50 !important;
+.active{
+    outline:3px solid yellow;
 }
 
-/* 選取 */
-.active {
-  background:#ffc107 !important;
+.jackpot{
+    background:#b71c1c;
 }
 
-.result {
-  margin-top:10px;
-  background:#222;
-  padding:10px;
-  border-radius:8px;
-  width:90%;
-  margin-left:auto;
-  margin-right:auto;
-  text-align:left;
+.double{
+    background:#1565c0;
 }
 
-.good { color:#4caf50; }
-.mid { color:#ffc107; }
-.bad { color:#f44336; }
+.safe{
+    background:#2e7d32;
+}
+
+.start{
+    background:#6a1b9a;
+}
+
+.result{
+    width:90%;
+    margin:auto;
+    background:#222;
+    padding:15px;
+    border-radius:10px;
+    text-align:left;
+}
+
+.good{
+    color:#4caf50;
+}
+
+.warn{
+    color:#ffc107;
+}
+
 </style>
+
 </head>
 
 <body>
 
-<h2>🧠 Board AI 菱形棋盤</h2>
+<h2>🎲 Board Adventure AI</h2>
+<p>點選目前所在格</p>
 
 <div class="board" id="board"></div>
 
-<div class="result" id="result">點選棋格開始分析</div>
+<div class="result" id="result">
+尚未選擇位置
+</div>
+
 
 <script>
 
-// ===== 骰子機率 =====
-const dice={2:1,3:2,4:3,5:4,6:5,7:6,8:5,9:4,10:3,11:2,12:1};
+// =================
+// 骰子機率
+// =================
 
-// ===== 獎勵格 =====
+const dice={
+2:1,
+3:2,
+4:3,
+5:4,
+6:5,
+7:6,
+8:5,
+9:4,
+10:3,
+11:2,
+12:1
+};
+
+
+// =================
+// 獎勵格
+// =================
+
 const jackpot=[5,15,25,35];
 const double=[10,30];
+const safe=[2,8,17,23,33];
 
-function typeOf(p){
-if(jackpot.includes(p)) return "JACKPOT";
-if(double.includes(p)) return "DOUBLE";
-return "NONE";
+
+// =================
+// 40格座標
+// 起點0在下面中央
+// 順時針
+// =================
+
+let pos=[];
+
+
+// 底部
+pos.push([159,318]); //0
+
+
+// 左下往左
+for(let i=1;i<=9;i++){
+    pos.push([159-i*35,318]);
 }
 
-function prob(r){ return dice[r]/36; }
 
-function getMult(type,step){
-if(type==="JACKPOT"){
-if(step===7) return 20000;
-if(step===6||step===8) return 6000;
-if(step>=5&&step<=9) return 1500;
-}
-if(type==="DOUBLE"){
-if(step===7) return 6000;
-if(step===6||step===8) return 1500;
-}
-return 1;
+// 左側往上
+for(let i=10;i<=19;i++){
+    pos.push([-156,318-(i-9)*35]);
 }
 
-// ===== 40格菱形座標（起點在下方）=====
-const coords = [
-[4,7],[3,6],[5,6],[2,5],[4,5],[6,5],[1,4],[3,4],[5,4],[7,4],
-[0,3],[2,3],[4,3],[6,3],[8,3],
-[1,2],[3,2],[5,2],[7,2],
-[2,1],[4,1],[6,1],
-[3,0],[5,0],
-[4,-1],
-[5,0],[7,0],[9,0],
-[6,1],[8,1],
-[7,2],[9,2],
-[8,3],[10,3],
-[9,4],[11,4],
-[10,5],[12,5],
-[11,6],[13,6]
-];
 
-// ===== 建立棋盤 =====
+// 上方往右
+for(let i=20;i<=29;i++){
+    pos.push([-156+(i-19)*35,-32]);
+}
+
+
+// 右側往下
+for(let i=30;i<=39;i++){
+    pos.push([194,3+(i-29)*35]);
+}
+
+
+
+// 建立棋盤
+
 let board=document.getElementById("board");
 
-coords.forEach((c,i)=>{
 
-let div=document.createElement("div");
-div.className="cell";
+for(let i=0;i<40;i++){
 
-div.style.left=(c[0]*22)+"px";
-div.style.top=(c[1]*22+120)+"px";
+    let div=document.createElement("div");
 
-if(i===0) div.classList.add("start");
+    div.className="cell";
 
-div.innerHTML=`<span>${i}</span>`;
+    if(i===0)
+        div.classList.add("start");
 
-div.onclick=()=>select(i,div);
+    if(jackpot.includes(i))
+        div.classList.add("jackpot");
 
-board.appendChild(div);
-});
+    if(double.includes(i))
+        div.classList.add("double");
 
-let last=null;
+    if(safe.includes(i))
+        div.classList.add("safe");
 
-// ===== 點選 =====
-function select(pos,el){
 
-document.querySelectorAll(".cell").forEach(c=>c.classList.remove("active"));
-el.classList.add("active");
+    div.style.left=pos[i][0]+"px";
+    div.style.top=pos[i][1]+"px";
 
-calc(pos);
+
+    div.innerHTML=i;
+
+
+    div.onclick=function(){
+
+        document.querySelectorAll(".cell")
+        .forEach(x=>x.classList.remove("active"));
+
+        div.classList.add("active");
+
+        analyze(i);
+
+    };
+
+
+    board.appendChild(div);
 }
 
-// ===== 分析 =====
-function calc(pos){
 
-let html=`📍 目前位置：${pos}<br><br>`;
+
+// =================
+// 分析
+// =================
+
+function typeOf(p){
+
+    if(jackpot.includes(p))
+        return "🔥10倍機會";
+
+    if(double.includes(p))
+        return "⭐2倍";
+
+    if(safe.includes(p))
+        return "🟢保本";
+
+    return "普通";
+
+}
+
+
+
+function analyze(now){
+
+let text="";
+
+text+=`
+<h3>目前位置：${now}</h3>
+`;
 
 let best="";
 
 for(let step=2;step<=12;step++){
 
-let next=(pos+step)%40;
-let t=typeOf(next);
-let p=prob(step);
-let mult=getMult(t,step);
+    let next=(now+step)%40;
 
-let color="bad";
-if(mult>=6000) color="good";
-else if(mult>=1500) color="mid";
+    let chance=dice[step]/36*100;
 
-if(mult>1 && !best){
-best=`👉 建議 ${mult}倍（+${step} → ${next}｜${t}）`;
+    let type=typeOf(next);
+
+
+    let mult=1;
+
+
+    if(jackpot.includes(next)){
+
+        if(step===7)
+            mult=20000;
+        else if(step===6||step===8)
+            mult=6000;
+        else
+            mult=1500;
+
+    }
+
+
+    if(double.includes(next)){
+
+        if(step===7)
+            mult=6000;
+        else
+            mult=1500;
+
+    }
+
+
+
+    if(mult>1 && best==="")
+    {
+        best=
+        `
+        <span class="good">
+        建議：${mult}倍<br>
+        目標：第${next}格<br>
+        距離：${step}格
+        </span>`;
+    }
+
+
+
+    text+=`
+    <hr>
+    ➡ ${step}步 → 第${next}格<br>
+    ${type}<br>
+    骰點機率：${chance.toFixed(2)}%
+    `;
 }
 
-html+=`
-➜ +${step} → ${next} ｜ ${t} ｜ ${(p*100).toFixed(2)}% ｜ ${mult}倍<br>
+
+
+text+=`
+<hr>
+<h3>
+${best || "建議維持1倍"}
+</h3>
 `;
+
+
+document.getElementById("result").innerHTML=text;
+
+
 }
 
-html+=`<br><b>${best||"建議1倍"}</b>`;
-
-document.getElementById("result").innerHTML=html;
-}
 
 </script>
 
